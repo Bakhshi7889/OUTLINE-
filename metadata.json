@@ -1,0 +1,5 @@
+{
+  "name": "OUTLINE",
+  "description": "A frontend-only website for AI-generated project scaffolding using Pollinations.ai and DeepSeek.",
+  "requestFramePermissions": []
+}

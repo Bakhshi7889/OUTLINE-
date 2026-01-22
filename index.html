@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OUTLINE | Project Kit Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --font-sans: "Inter", sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --font-logo: "Syne", sans-serif;
+      }
+      body {
+        background-color: #000000;
+        color: #ffffff;
+        font-family: var(--font-sans);
+        overflow-x: hidden;
+      }
+      /* Custom Scrollbar for Dark Mode */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #000000;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #333;
+        border-radius: 4px;
+        border: 2px solid #000000;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+      
+      /* Markdown Styles Dark */
+      .prose { color: #d4d4d4; max-width: none; }
+      .prose h1 { color: #fff; font-weight: 600; font-size: 1.75em; margin-top: 2em; margin-bottom: 0.75em; letter-spacing: -0.02em; }
+      .prose h2 { color: #fff; font-weight: 500; font-size: 1.4em; margin-top: 1.75em; margin-bottom: 0.75em; letter-spacing: -0.01em; }
+      .prose h3 { color: #e5e5e5; font-weight: 500; font-size: 1.2em; margin-top: 1.5em; margin-bottom: 0.5em; }
+      .prose p { margin-bottom: 1.25em; line-height: 1.7; color: #a3a3a3; }
+      .prose ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1.25em; color: #a3a3a3; }
+      .prose li { margin-bottom: 0.5em; }
+      .prose strong { color: #fff; font-weight: 600; }
+      .prose code { background: #1a1a1a; color: #e5e5e5; padding: 0.2em 0.4em; border-radius: 4px; font-size: 0.85em; font-family: var(--font-mono); border: 1px solid #333; }
+      .prose pre { background: #0a0a0a; border: 1px solid #222; padding: 1.25em; border-radius: 12px; overflow-x: auto; margin-bottom: 1.5em; }
+      .prose pre code { background: transparent; padding: 0; border: none; color: #d4d4d4; }
+      .prose blockquote { border-left: 2px solid #333; padding-left: 1em; font-style: italic; color: #737373; }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react/": "https://esm.sh/react@18.2.0/",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.294.0?deps=react@18.2.0",
+    "jszip": "https://esm.sh/jszip@3.10.1",
+    "react-markdown": "https://esm.sh/react-markdown@9.0.1?deps=react@18.2.0,react-dom@18.2.0",
+    "remark-gfm": "https://esm.sh/remark-gfm@4.0.0",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
