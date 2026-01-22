@@ -19,6 +19,12 @@ const TARGET_LOGOS: Record<string, string> = {
   'Bolt': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT9JIHE8U54Syeur3yryEv1n400-1M3cBBIh1qaNktBmw&s=10'
 };
 
+const TYPE_ICONS: Record<string, string> = {
+  'Website': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRoqmFxCjVCemt_EecBv2Bso0d35z1Gw-gqJQt_-uegTg&s=10',
+  'Mobile App': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRQpnQ_SL-LEiAEcMBAMwiNnyLmL48stofJyV0tOYRXIg&s=10',
+  'PWA': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR7zyGNuKCZTC3kVcJFs_qCNuVIBiDXNONdNyV71Oairg&s=10'
+};
+
 // Custom Dropdown Component
 interface CustomSelectProps {
   value: string;
@@ -53,24 +59,26 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
         className={`
-          flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all outline-none group
+          flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all outline-none group w-full md:w-auto justify-between md:justify-start
           ${isOpen 
             ? 'bg-white/10 border-white/10' 
             : 'bg-black/20 border-white/5 hover:bg-white/5 hover:border-white/10'}
         `}
         disabled={disabled}
       >
-        {optionIcons && optionIcons[value] ? (
-            <img 
-                src={optionIcons[value]} 
-                alt={value} 
-                className="w-3.5 h-3.5 object-contain rounded-sm opacity-90 group-hover:opacity-100 transition-opacity" 
-            />
-        ) : (
-            <Icon className={`w-3 h-3 transition-colors ${isOpen ? 'text-white' : 'text-white/40 group-hover:text-white/60'}`} />
-        )}
-        
-        <span className="text-[11px] font-medium text-white/90 leading-none mx-0.5">{value}</span>
+        <div className="flex items-center gap-2">
+            {optionIcons && optionIcons[value] ? (
+                <img 
+                    src={optionIcons[value]} 
+                    alt={value} 
+                    className="w-3.5 h-3.5 object-contain rounded-sm opacity-90 group-hover:opacity-100 transition-opacity" 
+                />
+            ) : (
+                <Icon className={`w-3 h-3 transition-colors ${isOpen ? 'text-white' : 'text-white/40 group-hover:text-white/60'}`} />
+            )}
+            
+            <span className="text-[11px] font-medium text-white/90 leading-none mx-0.5">{value}</span>
+        </div>
 
         <ChevronDown className={`w-2.5 h-2.5 text-white/20 transition-transform duration-300 ${isOpen ? 'rotate-180 text-white/60' : ''}`} />
       </button>
@@ -78,7 +86,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
       {/* Dropdown Menu */}
       <div 
         className={`
-            absolute left-0 min-w-[180px] z-50 
+            absolute left-0 min-w-[180px] w-full md:w-auto z-50 
             bg-[#0A0A0A] border border-white/10 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] 
             overflow-hidden transition-all duration-200
             ${dropUp 
@@ -163,17 +171,17 @@ export const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, isBusy, init
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto flex flex-col gap-8 animate-[fadeIn_0.8s_cubic-bezier(0.2,0.8,0.2,1)]">
-      <div className="text-center space-y-3">
-        <h2 className="text-3xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-white/40 tracking-tight leading-tight">
-          Turn an idea into a clear outline
+    <div className="w-full max-w-2xl mx-auto flex flex-col gap-6 md:gap-8 animate-[fadeIn_0.8s_cubic-bezier(0.2,0.8,0.2,1)]">
+      <div className="text-center space-y-4 px-2 md:px-0 mt-4 md:mt-0">
+        <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-white/40 tracking-tight leading-tight pb-1">
+          Line up your idea<br className="md:hidden" /> into a real plan
         </h2>
-        <p className="text-white/40 text-sm font-light max-w-md mx-auto leading-relaxed">
-          Describe what you want to make. We’ll handle the structure, logic, and next steps.
+        <p className="text-white/40 text-sm font-light max-w-[300px] sm:max-w-md mx-auto leading-relaxed">
+          Describe what you want to build. Lined will organize it into a clear, ready-to-use project outline.
         </p>
       </div>
 
-      <div className="bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 transition-all hover:border-white/15 hover:bg-white/[0.03] group">
+      <div className="bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 transition-all hover:border-white/15 hover:bg-white/[0.03] group mx-2 md:mx-0">
         
         {/* Text Area */}
         <div className="p-1 relative z-10">
@@ -181,33 +189,40 @@ export const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, isBusy, init
             value={idea}
             onChange={(e) => setIdea(e.target.value)}
             disabled={isBusy}
-            className="w-full h-32 bg-transparent text-base font-light text-white placeholder-white/20 p-5 resize-none outline-none selection:bg-white/20 custom-scrollbar"
+            className="w-full h-32 md:h-32 bg-transparent text-base font-light text-white placeholder-white/20 p-5 resize-none outline-none selection:bg-white/20 custom-scrollbar"
             placeholder="e.g. A personal finance dashboard that tracks subscription services..."
           />
         </div>
 
         {/* Action Bar & Controls */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-white/5 bg-white/[0.02] relative z-20 rounded-b-2xl gap-4">
+        <div className="flex flex-col md:flex-row items-center justify-between px-4 py-3 border-t border-white/5 bg-white/[0.02] relative z-20 rounded-b-2xl gap-3 md:gap-0">
             
             {/* Dropdowns */}
-            <div className="flex items-center gap-2">
-                 <CustomSelect 
-                    value={target} 
-                    options={TARGETS} 
-                    onChange={setTarget} 
-                    icon={Cpu} 
-                    disabled={isBusy} 
-                    dropUp={true}
-                    optionIcons={TARGET_LOGOS}
-                 />
-                 <CustomSelect 
-                    value={type} 
-                    options={TYPES} 
-                    onChange={setType} 
-                    icon={Layers} 
-                    disabled={isBusy}
-                    dropUp={true}
-                 />
+            <div className="flex items-center gap-2 w-full md:w-auto">
+                 <div className="flex-1 md:flex-none">
+                     <CustomSelect 
+                        value={target} 
+                        options={TARGETS} 
+                        onChange={setTarget} 
+                        icon={Cpu} 
+                        disabled={isBusy} 
+                        dropUp={true}
+                        optionIcons={TARGET_LOGOS}
+                        className="w-full md:w-auto"
+                     />
+                 </div>
+                 <div className="flex-1 md:flex-none">
+                     <CustomSelect 
+                        value={type} 
+                        options={TYPES} 
+                        onChange={setType} 
+                        icon={Layers} 
+                        disabled={isBusy}
+                        dropUp={true}
+                        optionIcons={TYPE_ICONS}
+                        className="w-full md:w-auto"
+                     />
+                 </div>
             </div>
 
             {/* Initialize Button */}
@@ -215,6 +230,7 @@ export const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, isBusy, init
                 onClick={handleSubmit}
                 disabled={!idea.trim() || isBusy}
                 className={`
+                    w-full md:w-auto
                     flex items-center justify-center gap-2 px-5 py-2 rounded-full 
                     bg-white text-black text-[10px] font-bold uppercase tracking-wide 
                     transition-all duration-300

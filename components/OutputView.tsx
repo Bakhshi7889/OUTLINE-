@@ -169,7 +169,7 @@ export const OutputView: React.FC<OutputViewProps> = ({ files }) => {
                 type="text" 
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Ask OUTLINE to clarify a specific task or spec..."
+                placeholder="Ask LINED to clarify a specific task or spec..."
                 className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-white/20 transition-all"
              />
              <button 

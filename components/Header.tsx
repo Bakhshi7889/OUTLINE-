@@ -13,7 +13,7 @@ export const Header: React.FC<HeaderProps> = ({ onShowHistory }) => {
             className="text-2xl md:text-3xl font-extrabold tracking-[-0.04em] text-white select-none hover:opacity-90 transition-opacity" 
             style={{ fontFamily: '"Syne", sans-serif' }}
         >
-          OUTLINE
+          LINED
         </h1>
       </div>
       
