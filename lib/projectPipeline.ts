@@ -40,7 +40,7 @@ RULES FOR ASKING QUESTIONS
 ────────────────────────
 RESPONSE FORMAT (STRICT)
 ────────────────────────
-You must output ONLY raw JSON. Do not wrap in markdown blocks.
+You must output ONLY raw JSON. Do not wrap in markdown blocks. Do not use <think> tags in the final output.
 
 If a question is needed:
 QUESTION: { "type": "A", "text": "Specific question text?", "options": ["Option A", "Option B", "Option C"] }
@@ -81,20 +81,20 @@ export const runFeasibilityCheck = async (
     ],
     {
       onChunk: (text) => { fullResponse += text; },
-      onThinking: () => {}, 
+      onThinking: () => {}, // Feasibility check thinking is internal, we don't display it to avoid clutter
       onError: () => onResult(false, "API Error during analysis"),
       onComplete: () => {
         const lowerRes = fullResponse.trim();
         
-        // Cleanup potential markdown wrapping (```json ... ```)
-        const cleanJson = (str: string) => str.replace(/```json/g, '').replace(/```/g, '').trim();
+        // Cleanup potential markdown wrapping (```json ... ```) or artifacts
+        const cleanStr = (str: string) => str.replace(/```json/g, '').replace(/```/g, '').trim();
 
         // 1. Check for Question
-        if (lowerRes.includes("QUESTION:")) {
+        if (fullResponse.includes("QUESTION:")) {
             try {
                 const rawSplit = fullResponse.split("QUESTION:");
                 if (rawSplit.length > 1) {
-                    const jsonStr = cleanJson(rawSplit[1]);
+                    const jsonStr = cleanStr(rawSplit[1]);
                     const questionObj = JSON.parse(jsonStr);
                     
                     if (questionObj && questionObj.text && Array.isArray(questionObj.options)) {

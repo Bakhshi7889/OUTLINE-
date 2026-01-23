@@ -40,6 +40,9 @@ export const ProgressView: React.FC<ProgressViewProps> = ({ state, activeTab, on
           const isViewActive = step.viewId === activeTab;
           const canView = step.viewId && (isCompleted || isActiveProcess || (idx === currentIndex && step.viewId));
 
+          // A step is visually "active"/highlighted if it's the one being viewed OR the one currently processing
+          const isHighlighted = isViewActive || isActiveProcess;
+
           return (
             <div 
               key={step.id}
@@ -47,25 +50,25 @@ export const ProgressView: React.FC<ProgressViewProps> = ({ state, activeTab, on
               className={`
                 relative flex items-center gap-4 p-4 rounded-xl border transition-all duration-300 ease-out overflow-hidden
                 ${canView ? 'cursor-pointer hover:bg-white/[0.08]' : 'cursor-default'}
-                ${isViewActive 
-                    ? 'bg-white/[0.06] border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.05)]' 
+                ${isHighlighted 
+                    ? 'bg-white/[0.06] border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.05)] opacity-100' 
                     : 'bg-transparent border-transparent opacity-50 hover:opacity-80'}
               `}
             >
-              {/* Active Tab Marker */}
-              {isViewActive && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-white" />
+              {/* Active Marker Line */}
+              {isHighlighted && (
+                  <div className={`absolute left-0 top-0 bottom-0 w-1 ${isActiveProcess ? 'bg-blue-400 animate-pulse' : 'bg-white'}`} />
               )}
 
               <div className="w-6 flex-shrink-0 flex items-center justify-center">
-                {isActiveProcess && <Loader2 className="w-4 h-4 animate-spin text-white" />}
+                {isActiveProcess && <Loader2 className="w-4 h-4 animate-spin text-blue-400" />}
                 {isCompleted && <Check className="w-4 h-4 text-emerald-400" />}
                 {isPending && <CircleDashed className="w-4 h-4 text-white/20" />}
               </div>
               
               <div className="flex-1 flex justify-between items-center">
                 <div className="flex flex-col">
-                    <span className={`text-sm tracking-wide ${isViewActive ? 'font-semibold text-white' : 'font-light text-white/70'}`}>
+                    <span className={`text-sm tracking-wide ${isHighlighted ? 'font-semibold text-white' : 'font-light text-white/70'}`}>
                     {step.label}
                     </span>
                     {canView && !isViewActive && (
@@ -78,7 +81,7 @@ export const ProgressView: React.FC<ProgressViewProps> = ({ state, activeTab, on
                 <div className="flex items-center gap-3">
                     {isViewActive && <Eye className="w-3.5 h-3.5 text-white/60" />}
                     {isActiveProcess && (
-                        <span className="text-[10px] font-mono text-white/30 animate-pulse">
+                        <span className="text-[10px] font-mono text-blue-400/80 animate-pulse">
                             PROCESSING
                         </span>
                     )}

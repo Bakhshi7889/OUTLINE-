@@ -14,8 +14,7 @@
     "lucide-react": "0.294.0",
     "jszip": "3.10.1",
     "react-markdown": "9.0.1",
-    "remark-gfm": "4.0.0",
-    "@google/genai": "^1.38.0"
+    "remark-gfm": "4.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

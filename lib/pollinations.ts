@@ -1,7 +1,5 @@
-import { GoogleGenAI } from "@google/genai";
-
 // ────────────────────────────────────────────────────────
-// API CONFIGURATION
+// POLLINATIONS API CONFIGURATION
 // ────────────────────────────────────────────────────────
 
 export interface StreamCallbacks {
@@ -17,41 +15,73 @@ export const streamGeneration = async (
 ) => {
   try {
     const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-        throw new Error("process.env.API_KEY is not set.");
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
     }
 
-    const ai = new GoogleGenAI({ apiKey });
-
-    // Extract system instruction and user prompt from messages
-    const systemMessage = messages.find(m => m.role === 'system');
-    const userMessage = messages.find(m => m.role === 'user');
-
-    if (!userMessage) {
-        throw new Error("No user message found.");
-    }
-
-    const prompt = userMessage.content;
-    const systemInstruction = systemMessage?.content;
-
-    const responseStream = await ai.models.generateContentStream({
-        model: 'gemini-3-pro-preview',
-        contents: prompt,
-        config: {
-            systemInstruction: systemInstruction,
-            // thinkingConfig: { thinkingBudget: 1024 } // Optional: Enable if using a model that supports it explicitly and you want to consume thoughts
-        }
+    // Using text.pollinations.ai with deepseek model
+    // This endpoint streams raw text which we parse for <think> tags
+    const response = await fetch('https://text.pollinations.ai/', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        messages: messages,
+        model: 'deepseek', 
+        stream: true,      
+        jsonMode: false,
+        seed: Math.floor(Math.random() * 10000)
+      }),
     });
 
-    for await (const chunk of responseStream) {
-        const text = chunk.text;
-        if (text) {
-            callbacks.onChunk(text);
-        }
+    if (!response.ok) {
+      throw new Error(`Pollinations API Error: ${response.statusText}`);
     }
+
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("Response body is empty");
+    
+    const decoder = new TextDecoder();
+    let isThinking = false;
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      const chunk = decoder.decode(value, { stream: true });
+      
+      // Basic state machine to separate <think> content from real content
+      let processChunk = chunk;
+      
+      if (processChunk.includes('<think>')) {
+        isThinking = true;
+        const parts = processChunk.split('<think>');
+        if (parts[0]) callbacks.onChunk(parts[0]); // Content before tag
+        processChunk = parts[1] || ''; // Continue processing after tag
+      }
+
+      if (processChunk.includes('</think>')) {
+        isThinking = false;
+        const parts = processChunk.split('</think>');
+        if (parts[0]) callbacks.onThinking(parts[0]); // Content inside tag
+        if (parts[1]) callbacks.onChunk(parts[1]);    // Content after tag
+        continue;
+      }
+
+      if (isThinking) {
+        callbacks.onThinking(processChunk);
+      } else {
+        callbacks.onChunk(processChunk);
+      }
+    }
+    
     callbacks.onComplete();
 
   } catch (err) {
-    callbacks.onError(err instanceof Error ? err.message : "Unknown error during generation");
+    callbacks.onError(err instanceof Error ? err.message : "Unknown network error");
   }
 };
