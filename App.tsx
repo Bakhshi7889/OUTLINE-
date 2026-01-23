@@ -11,6 +11,7 @@ import {
   generatePRD, 
   generateSpec, 
   generateTask,
+  refineProject,
   PipelineState 
 } from './lib/projectPipeline';
 import { saveProject, loadProjects, deleteProject, ProjectData } from './utils/storage';
@@ -35,6 +36,9 @@ const App: React.FC = () => {
   const [thinkingContent, setThinkingContent] = useState('');
   const [errorMessage, setErrorMessage] = useState<string>('');
   
+  // Refinement Buffer
+  const [refinementBuffer, setRefinementBuffer] = useState('');
+
   // UI State
   const [activeTab, setActiveTab] = useState<'prd' | 'spec' | 'task'>('prd');
   const [userArgument, setUserArgument] = useState('');
@@ -56,6 +60,8 @@ const App: React.FC = () => {
 
   // Determine what text to show in terminal
   const getTerminalContent = () => {
+      if (pipelineState === 'refining') return refinementBuffer;
+
       switch(activeTab) {
           case 'prd': return prdContent || (pipelineState === 'generating_prd' ? '' : 'Waiting for generation...');
           case 'spec': return specContent || 'Waiting for PRD completion...';
@@ -67,7 +73,6 @@ const App: React.FC = () => {
   const currentTerminalContent = getTerminalContent();
 
   // BUTTERY SMOOTH SCROLLING
-  // Instead of scrolling on every render, we request an animation frame if content changed.
   useEffect(() => {
     if (!shouldAutoScrollRef.current || !terminalRef.current) return;
 
@@ -87,7 +92,7 @@ const App: React.FC = () => {
     return () => {
         if (scrollTimeoutRef.current) cancelAnimationFrame(scrollTimeoutRef.current);
     };
-  }, [currentTerminalContent, activeTab]);
+  }, [currentTerminalContent, activeTab, pipelineState]);
 
   const handleTerminalScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -144,6 +149,96 @@ const App: React.FC = () => {
     const updatedHistory = contextHistory ? `${contextHistory}\n\n${newEntry}` : newEntry;
     setContextHistory(updatedHistory);
     startGeneration(projectInputs.idea, projectInputs.target, projectInputs.type, updatedHistory);
+  };
+
+  const handleRefine = async (instruction: string) => {
+      setPipelineState('refining');
+      setRefinementBuffer('Initializing refinement protocol...\n');
+      setThinkingContent('');
+      shouldAutoScrollRef.current = true;
+
+      await refineProject(
+          { prd: prdContent, spec: specContent, task: taskContent },
+          instruction,
+          (chunk) => setRefinementBuffer(prev => prev + chunk),
+          (think) => setThinkingContent(prev => prev + "\n" + think),
+          () => {
+              // Parse the buffer and apply updates
+              const buffer = refinementBuffer; // It's a closure, but we might need the ref or wait.
+              // Actually, since we updated state via setRefinementBuffer, we need the final value.
+              // But setRefinementBuffer is async. 
+              // Better to accumulate locally in a var during stream, but here we can just parse the final buffer from the callback if we change the sig, 
+              // or just use a timeout/effect. simpler: capture full text in a let var inside this function.
+          }
+      );
+      
+      // Wait for React state to settle or re-trigger parsing? 
+      // The streamGeneration in pipeline awaits completion.
+      // So we need to modify refineProject to return the full text or handle parsing there.
+      // Let's implement parsing logic inside the stream callback or after await.
+  };
+
+  // Improved Refine Handler with local variable accumulation
+  const handleSmartRefine = async (instruction: string) => {
+      setPipelineState('refining');
+      setRefinementBuffer('> Request: ' + instruction + '\n> Analyzing files...\n\n');
+      setThinkingContent('');
+      shouldAutoScrollRef.current = true;
+
+      let fullResponse = '';
+
+      await refineProject(
+          { prd: prdContent, spec: specContent, task: taskContent },
+          instruction,
+          (chunk) => {
+              fullResponse += chunk;
+              setRefinementBuffer(prev => prev + chunk);
+          },
+          (think) => setThinkingContent(prev => prev + "\n" + think),
+          () => {
+              // Parse Logic
+              const parseFile = (tag: string) => {
+                  const startTag = `<<<FILE: ${tag}>>>`;
+                  const endTag = `<<<END>>>`;
+                  const startIndex = fullResponse.indexOf(startTag);
+                  if (startIndex === -1) return null;
+                  
+                  const contentStart = startIndex + startTag.length;
+                  const endIndex = fullResponse.indexOf(endTag, contentStart);
+                  if (endIndex === -1) return null; // malformed
+
+                  return fullResponse.substring(contentStart, endIndex).trim();
+              };
+
+              const newPrd = parseFile('PRD');
+              const newSpec = parseFile('SPEC');
+              const newTask = parseFile('TASK');
+
+              let updatesCount = 0;
+              if (newPrd) { setPrdContent(newPrd); updatesCount++; }
+              if (newSpec) { setSpecContent(newSpec); updatesCount++; }
+              if (newTask) { setTaskContent(newTask); updatesCount++; }
+
+              setPipelineState('complete');
+              
+              // Auto-save the update
+              if (projectInputs && updatesCount > 0) {
+                 const updatedProject = {
+                    id: Date.now().toString(),
+                    name: projectInputs.idea.slice(0, 30) + " (Refined)",
+                    timestamp: Date.now(),
+                    inputs: projectInputs,
+                    files: { 
+                        prd: newPrd || prdContent, 
+                        spec: newSpec || specContent, 
+                        task: newTask || taskContent 
+                    }
+                 };
+                 // We don't overwrite history immediately to avoid spam, or we can. 
+                 // Let's just update the "current view" which allows user to download.
+              }
+          }
+      );
   };
 
   const loadProjectFromHistory = (p: ProjectData) => {
@@ -241,6 +336,16 @@ const App: React.FC = () => {
 
   const isIdle = pipelineState === 'idle';
 
+  // Helper for filename
+  const getProjectSlug = () => {
+      if (!projectInputs?.idea) return 'lined-project';
+      return 'lined-' + projectInputs.idea
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+        .slice(0, 30);
+  };
+
   return (
     <div className="min-h-screen w-full flex flex-col items-center relative bg-black selection:bg-white/20 selection:text-white overflow-hidden">
       
@@ -294,7 +399,7 @@ const App: React.FC = () => {
               {/* Terminal View */}
               <div className="mt-8 rounded-xl border border-white/10 bg-[#050505] shadow-2xl transition-all duration-300 relative overflow-hidden">
                  
-                 {/* Terminal Header with Solid-ish Background */}
+                 {/* Terminal Header */}
                  <div className="absolute top-0 left-0 w-full h-9 bg-[#0f0f0f]/90 backdrop-blur-md flex items-center justify-between px-4 border-b border-white/5 z-20">
                     <div className="flex items-center gap-2">
                         <div className="flex gap-1.5">
@@ -303,7 +408,7 @@ const App: React.FC = () => {
                             <div className="w-2.5 h-2.5 rounded-full bg-green-500/20" />
                         </div>
                         <span className="ml-3 text-[10px] text-white/30 font-mono">
-                            output/{activeTab}.md
+                            {pipelineState === 'refining' ? 'pipeline/refine_stream' : `output/${activeTab}.md`}
                         </span>
                     </div>
                     <div className={`flex items-center gap-1 transition-opacity duration-300 ${!isAutoScrolling ? 'opacity-100' : 'opacity-0'}`}>
@@ -324,24 +429,6 @@ const App: React.FC = () => {
                         <span className="animate-pulse text-white inline-block w-2 h-4 bg-white/50 align-middle ml-1"> </span>
                     </pre>
                  </div>
-                 
-                 {!isAutoScrolling && (
-                    <button 
-                        onClick={() => {
-                            shouldAutoScrollRef.current = true;
-                            setIsAutoScrolling(true);
-                            if (terminalRef.current) {
-                                terminalRef.current.scrollTo({
-                                    top: terminalRef.current.scrollHeight,
-                                    behavior: 'smooth'
-                                });
-                            }
-                        }}
-                        className="absolute bottom-4 right-4 bg-white/10 hover:bg-white/20 text-white/60 p-2 rounded-full backdrop-blur-md transition-all z-30 animate-bounce"
-                    >
-                        <ArrowDown className="w-4 h-4" />
-                    </button>
-                 )}
               </div>
            </div>
         )}
@@ -358,18 +445,23 @@ const App: React.FC = () => {
                       Start New Project
                   </button>
               </div>
-              <OutputView files={{ prd: prdContent, spec: specContent, task: taskContent }} />
+              
+              <OutputView 
+                files={{ prd: prdContent, spec: specContent, task: taskContent }} 
+                projectName={getProjectSlug()}
+                onRefine={handleSmartRefine}
+              />
            </div>
         )}
 
         {(pipelineState === 'not_feasible' || pipelineState === 'error') && (
             <div className="max-w-md mx-auto mt-12 p-8 rounded-2xl bg-red-900/10 border border-red-500/20 flex flex-col gap-4 text-center backdrop-blur-xl animate-[fadeIn_0.5s_ease-out]">
+                {/* Error UI kept same */}
                 <AlertCircle className="w-10 h-10 text-red-500/80 mx-auto" />
                 <h3 className="text-lg font-medium text-red-200">
                     {pipelineState === 'not_feasible' ? 'Feasibility Check Failed' : 'Generation Error'}
                 </h3>
                 <p className="text-sm text-red-200/60 leading-relaxed">{errorMessage}</p>
-                
                 <div className="mt-4 flex flex-col gap-2 text-left w-full">
                     <label className="text-[10px] uppercase tracking-wider text-red-200/40 font-semibold ml-1">
                         Argue your case
@@ -392,9 +484,7 @@ const App: React.FC = () => {
                         </button>
                     </div>
                 </div>
-
                 <div className="w-full h-px bg-red-500/10 my-2" />
-
                 <button 
                     onClick={() => {
                         setPipelineState('idle');
@@ -408,8 +498,6 @@ const App: React.FC = () => {
         )}
 
       </main>
-
-      {/* Footer Removed */}
     </div>
   );
 };

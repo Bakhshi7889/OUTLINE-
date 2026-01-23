@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Download, FileText, ChevronDown, ChevronRight, Package, Copy, MessageSquare, Send, Sparkles } from 'lucide-react';
+import { Download, FileText, ChevronDown, ChevronRight, Package, Copy, MessageSquare, Send, Sparkles, RefreshCw, PenTool } from 'lucide-react';
 import { createZip } from '../utils/zip';
 import { consultProject } from '../lib/projectPipeline';
 
@@ -11,6 +11,8 @@ interface OutputViewProps {
     spec: string;
     task: string;
   };
+  projectName: string;
+  onRefine: (instruction: string) => void;
 }
 
 const ITEMS = [
@@ -19,10 +21,11 @@ const ITEMS = [
     { id: 'task', label: 'Implementation Tasks', desc: 'Phase-by-phase Build Instructions' }
 ] as const;
 
-export const OutputView: React.FC<OutputViewProps> = ({ files }) => {
+export const OutputView: React.FC<OutputViewProps> = ({ files, projectName, onRefine }) => {
   const [openSection, setOpenSection] = useState<'prd' | 'spec' | 'task'>('prd');
   
   // Consultation State
+  const [consultMode, setConsultMode] = useState<'chat' | 'refine'>('chat');
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [isConsulting, setIsConsulting] = useState(false);
@@ -50,7 +53,7 @@ export const OutputView: React.FC<OutputViewProps> = ({ files }) => {
     const url = URL.createObjectURL(zipBlob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'gen-prompt-kit.zip';
+    a.download = `${projectName}.zip`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -62,26 +65,26 @@ export const OutputView: React.FC<OutputViewProps> = ({ files }) => {
     navigator.clipboard.writeText(content);
   };
 
-  const handleQuestionSubmit = async () => {
+  const handleAction = async () => {
       if (!question.trim() || isConsulting) return;
       
       setIsConsulting(true);
-      setAnswer('');
       
-      await consultProject(
-          files, 
-          question,
-          (chunk) => setAnswer(prev => prev + chunk),
-          () => setIsConsulting(false)
-      );
-  };
-
-  // Auto scroll answer into view
-  useEffect(() => {
-      if (answer && answerRef.current) {
-         // Optionally scroll to bottom of answer if it gets long
+      if (consultMode === 'chat') {
+        setAnswer('');
+        await consultProject(
+            files, 
+            question,
+            (chunk) => setAnswer(prev => prev + chunk),
+            () => setIsConsulting(false)
+        );
+      } else {
+        // Refine Mode
+        // We trigger the parent refine handler which will update the App state
+        onRefine(question);
+        // We don't wait for it here because it redirects to pipeline view
       }
-  }, [answer]);
+  };
 
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col gap-4 pb-20">
@@ -89,7 +92,9 @@ export const OutputView: React.FC<OutputViewProps> = ({ files }) => {
       {/* Top Action Bar */}
       <div className="flex justify-between items-center mb-2 px-2">
          <div className="flex items-center gap-2">
-            {/* Placeholder for future chat history or status */}
+            <span className="text-[10px] text-white/30 font-mono bg-white/5 px-2 py-1 rounded">
+                project/{projectName}
+            </span>
          </div>
          <button 
             onClick={handleDownloadAll}
@@ -176,15 +181,28 @@ export const OutputView: React.FC<OutputViewProps> = ({ files }) => {
         })}
       </div>
       
-      {/* Consultation Area */}
+      {/* Consultation / Refinement Area */}
       <div className="mt-8 pt-8 border-t border-white/5 animate-[fadeIn_0.5s_ease-out]">
-         <h4 className="text-sm font-medium text-white/60 mb-4 flex items-center gap-2">
-            <MessageSquare className="w-4 h-4" />
-            Consultation <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-white/40">BETA</span>
-         </h4>
+         
+         <div className="flex items-center gap-6 mb-4">
+            <button 
+                onClick={() => setConsultMode('chat')}
+                className={`text-sm font-medium flex items-center gap-2 transition-colors ${consultMode === 'chat' ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
+            >
+                <MessageSquare className="w-4 h-4" />
+                Ask Question
+            </button>
+            <button 
+                onClick={() => setConsultMode('refine')}
+                className={`text-sm font-medium flex items-center gap-2 transition-colors ${consultMode === 'refine' ? 'text-white' : 'text-white/40 hover:text-white/60'}`}
+            >
+                <RefreshCw className="w-4 h-4" />
+                Refine Files
+            </button>
+         </div>
 
-         {/* Answer Display */}
-         {answer && (
+         {/* Answer Display (Chat Mode) */}
+         {consultMode === 'chat' && answer && (
              <div 
                 ref={answerRef}
                 className="mb-6 p-6 rounded-2xl bg-white/[0.04] border border-white/10 shadow-lg animate-[slideIn_0.3s_ease-out]"
@@ -198,27 +216,41 @@ export const OutputView: React.FC<OutputViewProps> = ({ files }) => {
                 </div>
              </div>
          )}
+         
+         {/* Refine Info (Refine Mode) */}
+         {consultMode === 'refine' && (
+             <div className="mb-4 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-200">
+                <p className="flex items-center gap-2">
+                    <PenTool className="w-3 h-3" />
+                    <strong>Smart Update:</strong> Requesting a change here will regenerate the relevant files. The process will restart in the main view.
+                </p>
+             </div>
+         )}
 
          <div className="flex gap-2 relative">
              <input 
                 type="text" 
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleQuestionSubmit()}
-                placeholder="Ask how to implement a specific feature or setup the project..."
+                onKeyDown={(e) => e.key === 'Enter' && handleAction()}
+                placeholder={consultMode === 'chat' ? "Ask how to implement a specific feature..." : "e.g. Add a dark mode section to the Spec..."}
                 disabled={isConsulting}
                 className="flex-1 bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-white/20 transition-all disabled:opacity-50"
              />
              <button 
-                onClick={handleQuestionSubmit}
+                onClick={handleAction}
                 disabled={!question.trim() || isConsulting}
-                className="px-6 bg-white text-black rounded-xl text-sm font-bold hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 disabled:bg-white/10 disabled:text-white/20 flex items-center gap-2"
+                className={`
+                    px-6 rounded-xl text-sm font-bold hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 disabled:text-white/20 flex items-center gap-2
+                    ${consultMode === 'refine' ? 'bg-blue-600 text-white disabled:bg-white/10' : 'bg-white text-black disabled:bg-white/10'}
+                `}
              >
                 {isConsulting ? (
-                    <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                    <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 ) : (
                     <>
-                        Ask <Send className="w-3 h-3" />
+                        {consultMode === 'chat' ? 'Ask' : 'Update'} 
+                        {consultMode === 'chat' ? <Send className="w-3 h-3" /> : <RefreshCw className="w-3 h-3" />}
                     </>
                 )}
              </button>

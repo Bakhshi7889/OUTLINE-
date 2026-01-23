@@ -10,7 +10,8 @@ export type PipelineState =
   | 'generating_task' 
   | 'complete' 
   | 'error' 
-  | 'not_feasible';
+  | 'not_feasible'
+  | 'refining'; // Added refining state
 
 export interface ProjectContext {
   idea: string;
@@ -359,9 +360,77 @@ export const consultProject = async (
     [{ role: "system", content: "You are a helpful mentor for a beginner developer." }, { role: "user", content: prompt }],
     { 
         onChunk, 
-        onThinking: () => {}, // Don't show thinking for consultation
+        onThinking: () => {}, 
         onError: (e) => onChunk(`Error: ${e}`), 
         onComplete 
     }
   );
 };
+
+// ────────────────────────────────────────────────────────
+// NEW REFINEMENT FUNCTION
+// ────────────────────────────────────────────────────────
+
+export const refineProject = async (
+    files: { prd: string; spec: string; task: string },
+    userInstruction: string,
+    onChunk: (text: string) => void,
+    onThinking: (text: string) => void,
+    onComplete: () => void
+) => {
+    const prompt = `
+    You are a Senior Project Architect. 
+    The user wants to REFINE the existing project files.
+    
+    USER INSTRUCTION: "${userInstruction}"
+
+    --- CURRENT FILES ---
+    (PRD, Spec, and Task files are loaded in context)
+
+    --- INSTRUCTIONS ---
+    1. Decide which file(s) need to be updated to satisfy the instruction.
+    2. Rewrite the COMPLETE content of the modified file(s).
+    3. Use the following strict format for outputting files:
+
+    <<<FILE: PRD>>>
+    ... full updated markdown content for PRD ...
+    <<<END>>>
+
+    <<<FILE: SPEC>>>
+    ... full updated markdown content for Spec ...
+    <<<END>>>
+
+    <<<FILE: TASK>>>
+    ... full updated markdown content for Task ...
+    <<<END>>>
+
+    If a file does not need changes, DO NOT output it.
+    Only output the files that change.
+    Do not output conversational text outside the file blocks.
+    `;
+
+    // We pass truncated context to save tokens, but enough to know what to change
+    const contextContent = `
+    PRD START:
+    ${files.prd.substring(0, 4000)}
+    
+    SPEC START:
+    ${files.spec.substring(0, 4000)}
+    
+    TASK START:
+    ${files.task.substring(0, 4000)}
+    `;
+
+    await streamGeneration(
+        [
+            { role: "system", content: "You are a precise technical editor. You output updated file content in strict blocks." }, 
+            { role: "user", content: contextContent + "\n\n" + prompt }
+        ],
+        { 
+            onChunk, 
+            onThinking, 
+            onError: (e) => onChunk(`Error: ${e}`), 
+            onComplete 
+        }
+    );
+}
