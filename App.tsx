@@ -15,7 +15,7 @@ import {
   PipelineState 
 } from './lib/projectPipeline';
 import { saveProject, loadProjects, deleteProject, ProjectData } from './utils/storage';
-import { AlertCircle, RotateCcw, Sparkles, ArrowDown, ArrowRight } from 'lucide-react';
+import { AlertCircle, RotateCcw, Sparkles, ArrowDown, ArrowRight, Copy, Check } from 'lucide-react';
 
 const App: React.FC = () => {
   const [pipelineState, setPipelineState] = useState<PipelineState>('idle');
@@ -38,6 +38,9 @@ const App: React.FC = () => {
   
   // Refinement Buffer
   const [refinementBuffer, setRefinementBuffer] = useState('');
+  
+  // Terminal UI
+  const [isCopied, setIsCopied] = useState(false);
 
   // UI State
   const [activeTab, setActiveTab] = useState<'prd' | 'spec' | 'task'>('prd');
@@ -63,7 +66,7 @@ const App: React.FC = () => {
       if (pipelineState === 'refining') return refinementBuffer;
 
       switch(activeTab) {
-          case 'prd': return prdContent || (pipelineState === 'generating_prd' ? '' : 'Waiting for generation...');
+          case 'prd': return prdContent || (pipelineState === 'generating_prd' ? '' : 'Generating project files...');
           case 'spec': return specContent || 'Waiting for PRD completion...';
           case 'task': return taskContent || 'Waiting for Spec completion...';
           default: return '';
@@ -71,6 +74,12 @@ const App: React.FC = () => {
   };
 
   const currentTerminalContent = getTerminalContent();
+
+  const handleCopyTerminal = () => {
+      navigator.clipboard.writeText(currentTerminalContent);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+  };
 
   // BUTTERY SMOOTH SCROLLING
   useEffect(() => {
@@ -151,34 +160,7 @@ const App: React.FC = () => {
     startGeneration(projectInputs.idea, projectInputs.target, projectInputs.type, updatedHistory);
   };
 
-  const handleRefine = async (instruction: string) => {
-      setPipelineState('refining');
-      setRefinementBuffer('Initializing refinement protocol...\n');
-      setThinkingContent('');
-      shouldAutoScrollRef.current = true;
-
-      await refineProject(
-          { prd: prdContent, spec: specContent, task: taskContent },
-          instruction,
-          (chunk) => setRefinementBuffer(prev => prev + chunk),
-          (think) => setThinkingContent(prev => prev + "\n" + think),
-          () => {
-              // Parse the buffer and apply updates
-              const buffer = refinementBuffer; // It's a closure, but we might need the ref or wait.
-              // Actually, since we updated state via setRefinementBuffer, we need the final value.
-              // But setRefinementBuffer is async. 
-              // Better to accumulate locally in a var during stream, but here we can just parse the final buffer from the callback if we change the sig, 
-              // or just use a timeout/effect. simpler: capture full text in a let var inside this function.
-          }
-      );
-      
-      // Wait for React state to settle or re-trigger parsing? 
-      // The streamGeneration in pipeline awaits completion.
-      // So we need to modify refineProject to return the full text or handle parsing there.
-      // Let's implement parsing logic inside the stream callback or after await.
-  };
-
-  // Improved Refine Handler with local variable accumulation
+  // Improved Refine Handler with local variable accumulation and Robust Regex Parsing
   const handleSmartRefine = async (instruction: string) => {
       setPipelineState('refining');
       setRefinementBuffer('> Request: ' + instruction + '\n> Analyzing files...\n\n');
@@ -196,29 +178,26 @@ const App: React.FC = () => {
           },
           (think) => setThinkingContent(prev => prev + "\n" + think),
           () => {
-              // Parse Logic
-              const parseFile = (tag: string) => {
-                  const startTag = `<<<FILE: ${tag}>>>`;
-                  const endTag = `<<<END>>>`;
-                  const startIndex = fullResponse.indexOf(startTag);
-                  if (startIndex === -1) return null;
-                  
-                  const contentStart = startIndex + startTag.length;
-                  const endIndex = fullResponse.indexOf(endTag, contentStart);
-                  if (endIndex === -1) return null; // malformed
-
-                  return fullResponse.substring(contentStart, endIndex).trim();
+              // Parse Logic using Regex for better robustness
+              // Matches <<<FILE: PRD>>> content <<<END>>> (case insensitive, loose spacing)
+              const parseFileRegex = (tagName: string) => {
+                  const regex = new RegExp(`<<<\\s*FILE:\\s*${tagName}\\s*>>>([\\s\\S]*?)<<<\\s*END\\s*>>>`, 'i');
+                  const match = fullResponse.match(regex);
+                  return match ? match[1].trim() : null;
               };
 
-              const newPrd = parseFile('PRD');
-              const newSpec = parseFile('SPEC');
-              const newTask = parseFile('TASK');
+              const newPrd = parseFileRegex('PRD');
+              const newSpec = parseFileRegex('SPEC');
+              const newTask = parseFileRegex('TASK');
 
               let updatesCount = 0;
               if (newPrd) { setPrdContent(newPrd); updatesCount++; }
               if (newSpec) { setSpecContent(newSpec); updatesCount++; }
               if (newTask) { setTaskContent(newTask); updatesCount++; }
 
+              // If no valid tags found but we have content, it might be a general reply or failure
+              // In a production app, we would handle this "messy" response better.
+              
               setPipelineState('complete');
               
               // Auto-save the update
@@ -234,8 +213,7 @@ const App: React.FC = () => {
                         task: newTask || taskContent 
                     }
                  };
-                 // We don't overwrite history immediately to avoid spam, or we can. 
-                 // Let's just update the "current view" which allows user to download.
+                 // Allow immediate download of refined files
               }
           }
       );
@@ -397,7 +375,7 @@ const App: React.FC = () => {
               <ThinkingPanel content={thinkingContent} />
               
               {/* Terminal View */}
-              <div className="mt-8 rounded-xl border border-white/10 bg-[#050505] shadow-2xl transition-all duration-300 relative overflow-hidden">
+              <div className="mt-8 rounded-xl border border-white/10 bg-[#050505] shadow-2xl transition-all duration-300 relative overflow-hidden group">
                  
                  {/* Terminal Header */}
                  <div className="absolute top-0 left-0 w-full h-9 bg-[#0f0f0f]/90 backdrop-blur-md flex items-center justify-between px-4 border-b border-white/5 z-20">
@@ -411,9 +389,20 @@ const App: React.FC = () => {
                             {pipelineState === 'refining' ? 'pipeline/refine_stream' : `output/${activeTab}.md`}
                         </span>
                     </div>
-                    <div className={`flex items-center gap-1 transition-opacity duration-300 ${!isAutoScrolling ? 'opacity-100' : 'opacity-0'}`}>
-                        <span className="text-[9px] text-white/30 uppercase">Paused</span>
-                        <ArrowDown className="w-3 h-3 text-white/20" />
+                    <div className="flex items-center gap-2">
+                        {/* Copy Button */}
+                        <button 
+                            onClick={handleCopyTerminal}
+                            className="p-1 hover:bg-white/10 rounded transition-colors text-white/30 hover:text-white"
+                            title="Copy output"
+                        >
+                            {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        </button>
+                        
+                        <div className={`flex items-center gap-1 transition-opacity duration-300 ${!isAutoScrolling ? 'opacity-100' : 'opacity-0'}`}>
+                            <span className="text-[9px] text-white/30 uppercase">Paused</span>
+                            <ArrowDown className="w-3 h-3 text-white/20" />
+                        </div>
                     </div>
                  </div>
                  
@@ -423,10 +412,10 @@ const App: React.FC = () => {
                     className="p-6 pt-14 h-96 overflow-y-auto relative custom-scrollbar scroll-smooth bg-black/40"
                  >
                     <pre 
-                        className="text-xs font-mono text-white/70 whitespace-pre-wrap font-light leading-relaxed pb-8 break-words max-w-full"
+                        className="text-xs font-mono text-gray-300 whitespace-pre-wrap font-light leading-relaxed pb-8 break-words max-w-full"
                     >
                         {currentTerminalContent}
-                        <span className="animate-pulse text-white inline-block w-2 h-4 bg-white/50 align-middle ml-1"> </span>
+                        <span className="animate-pulse text-blue-400 inline-block w-2 h-4 bg-blue-400/50 align-middle ml-1"> </span>
                     </pre>
                  </div>
               </div>
@@ -438,7 +427,10 @@ const App: React.FC = () => {
               <div className="w-full flex justify-between items-center mb-4 px-2">
                   <div className="flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-white/60" />
-                      <h2 className="text-lg font-medium text-white tracking-tight">Your outline is ready</h2>
+                      <div>
+                        <h2 className="text-lg font-medium text-white tracking-tight">Your outline is ready</h2>
+                        <p className="text-sm text-white/40">You now have everything needed to start building.</p>
+                      </div>
                   </div>
                   <button onClick={handleReset} className="group flex items-center gap-2 text-xs text-white/40 hover:text-white transition-colors px-4 py-2 rounded-full border border-transparent hover:border-white/10 hover:bg-white/5">
                       <RotateCcw className="w-3 h-3 group-hover:-rotate-180 transition-transform duration-500" /> 

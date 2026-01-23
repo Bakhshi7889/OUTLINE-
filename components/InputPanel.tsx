@@ -157,8 +157,6 @@ export const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, isBusy, init
 
   // Auto-Save Draft
   useEffect(() => {
-     // Save draft if we are not in read-only/history mode (implied by absence of explicit initialValues override context, 
-     // though here we just save whatever is being typed as the current draft)
      const timer = setTimeout(() => {
          saveDraft({ idea, target, type });
      }, 500);
@@ -177,7 +175,7 @@ export const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, isBusy, init
           Line up your idea<br className="md:hidden" /> into a real plan
         </h2>
         <p className="text-white/40 text-sm font-light max-w-[300px] sm:max-w-md mx-auto leading-relaxed">
-          Describe what you want to build. Lined will organize it into a clear, ready-to-use project outline.
+          Describe what you want to build. Lined will organize it into a clear, ready-to-use project plan.
         </p>
       </div>
 
@@ -198,31 +196,34 @@ export const InputPanel: React.FC<InputPanelProps> = ({ onGenerate, isBusy, init
         <div className="flex flex-col md:flex-row items-center justify-between px-4 py-3 border-t border-white/5 bg-white/[0.02] relative z-20 rounded-b-2xl gap-3 md:gap-0">
             
             {/* Dropdowns */}
-            <div className="flex items-center gap-2 w-full md:w-auto">
-                 <div className="flex-1 md:flex-none">
-                     <CustomSelect 
-                        value={target} 
-                        options={TARGETS} 
-                        onChange={setTarget} 
-                        icon={Cpu} 
-                        disabled={isBusy} 
-                        dropUp={true}
-                        optionIcons={TARGET_LOGOS}
-                        className="w-full md:w-auto"
-                     />
+            <div className="flex flex-col gap-2 w-full md:w-auto">
+                 <div className="flex items-center gap-2 w-full md:w-auto">
+                     <div className="flex-1 md:flex-none">
+                         <CustomSelect 
+                            value={target} 
+                            options={TARGETS} 
+                            onChange={setTarget} 
+                            icon={Cpu} 
+                            disabled={isBusy} 
+                            dropUp={true}
+                            optionIcons={TARGET_LOGOS}
+                            className="w-full md:w-auto"
+                         />
+                     </div>
+                     <div className="flex-1 md:flex-none">
+                         <CustomSelect 
+                            value={type} 
+                            options={TYPES} 
+                            onChange={setType} 
+                            icon={Layers} 
+                            disabled={isBusy}
+                            dropUp={true}
+                            optionIcons={TYPE_ICONS}
+                            className="w-full md:w-auto"
+                         />
+                     </div>
                  </div>
-                 <div className="flex-1 md:flex-none">
-                     <CustomSelect 
-                        value={type} 
-                        options={TYPES} 
-                        onChange={setType} 
-                        icon={Layers} 
-                        disabled={isBusy}
-                        dropUp={true}
-                        optionIcons={TYPE_ICONS}
-                        className="w-full md:w-auto"
-                     />
-                 </div>
+                 <p className="text-[9px] text-white/30 pl-1">This adapts the output to how your tool expects instructions.</p>
             </div>
 
             {/* Initialize Button */}

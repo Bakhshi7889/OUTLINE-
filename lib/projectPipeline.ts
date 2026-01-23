@@ -142,6 +142,11 @@ We are NOT a chat app. We want to start generation as fast as possible.
    - Present options as simple buttons.
    - Do NOT ask technical questions (no stacks, no databases).
    - NEVER ask more than 2 questions total in the conversation history. If 2 have been asked, force a decision and proceed.
+   
+   - Focus questions based on Project Type:
+     * Website: Focus on pages, user types, and core flows.
+     * Mobile App: Focus on offline capability, device permissions, and gestures.
+     * PWA: Focus on installability, caching, and sync strategies.
 
 3. TONE:
    - Calm, confident, and decisive.
@@ -262,6 +267,7 @@ export const generatePRD = async (
     2. Core Features (MVP)
     3. User Flow
     4. Non-Functional Requirements
+    5. Constraints & Assumptions (Single-user v1, No auth, Offline-first, No payments)
     
     Format: Markdown.
   `;
@@ -292,6 +298,7 @@ export const generateSpec = async (
     3. Data Models (TypeScript Interfaces)
     4. API Strategy
     5. Folder Structure
+    6. Constraints & Assumptions
     
     Format: Markdown.
   `;
