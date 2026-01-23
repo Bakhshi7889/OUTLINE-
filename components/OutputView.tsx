@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Download, FileText, ChevronDown, ChevronRight, Package, Copy, MessageSquare } from 'lucide-react';
+import { Download, FileText, ChevronDown, ChevronRight, Package, Copy, MessageSquare, Send, Sparkles } from 'lucide-react';
 import { createZip } from '../utils/zip';
+import { consultProject } from '../lib/projectPipeline';
 
 interface OutputViewProps {
   files: {
@@ -19,9 +20,13 @@ const ITEMS = [
 ] as const;
 
 export const OutputView: React.FC<OutputViewProps> = ({ files }) => {
-  // Accordion state - allows one open at a time
   const [openSection, setOpenSection] = useState<'prd' | 'spec' | 'task'>('prd');
+  
+  // Consultation State
   const [question, setQuestion] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [isConsulting, setIsConsulting] = useState(false);
+  const answerRef = useRef<HTMLDivElement>(null);
 
   const handleDownloadSingle = (filename: string, content: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -57,13 +62,26 @@ export const OutputView: React.FC<OutputViewProps> = ({ files }) => {
     navigator.clipboard.writeText(content);
   };
 
-  const handleQuestionSubmit = () => {
-      // For now, this is a placeholder for the interaction logic
-      // In a full implementation, this would call the API
-      if (!question.trim()) return;
-      alert("Consultation feature coming in next update: " + question);
-      setQuestion('');
+  const handleQuestionSubmit = async () => {
+      if (!question.trim() || isConsulting) return;
+      
+      setIsConsulting(true);
+      setAnswer('');
+      
+      await consultProject(
+          files, 
+          question,
+          (chunk) => setAnswer(prev => prev + chunk),
+          () => setIsConsulting(false)
+      );
   };
+
+  // Auto scroll answer into view
+  useEffect(() => {
+      if (answer && answerRef.current) {
+         // Optionally scroll to bottom of answer if it gets long
+      }
+  }, [answer]);
 
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col gap-4 pb-20">
@@ -158,26 +176,51 @@ export const OutputView: React.FC<OutputViewProps> = ({ files }) => {
         })}
       </div>
       
-      {/* Question / Clarification Area (The missing feature) */}
-      <div className="mt-8 pt-8 border-t border-white/5">
+      {/* Consultation Area */}
+      <div className="mt-8 pt-8 border-t border-white/5 animate-[fadeIn_0.5s_ease-out]">
          <h4 className="text-sm font-medium text-white/60 mb-4 flex items-center gap-2">
             <MessageSquare className="w-4 h-4" />
-            Have questions about this kit?
+            Consultation <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-white/40">BETA</span>
          </h4>
-         <div className="flex gap-2">
+
+         {/* Answer Display */}
+         {answer && (
+             <div 
+                ref={answerRef}
+                className="mb-6 p-6 rounded-2xl bg-white/[0.04] border border-white/10 shadow-lg animate-[slideIn_0.3s_ease-out]"
+             >
+                <div className="flex items-center gap-2 mb-3 text-xs text-blue-400 font-medium uppercase tracking-wider">
+                    <Sparkles className="w-3 h-3" />
+                    AI Expert
+                </div>
+                <div className="prose prose-invert prose-sm max-w-none text-white/80">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
+                </div>
+             </div>
+         )}
+
+         <div className="flex gap-2 relative">
              <input 
                 type="text" 
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Ask LINED to clarify a specific task or spec..."
-                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-white/20 transition-all"
+                onKeyDown={(e) => e.key === 'Enter' && handleQuestionSubmit()}
+                placeholder="Ask how to implement a specific feature or setup the project..."
+                disabled={isConsulting}
+                className="flex-1 bg-black border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-white/20 transition-all disabled:opacity-50"
              />
              <button 
                 onClick={handleQuestionSubmit}
-                disabled={!question.trim()}
-                className="px-6 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+                disabled={!question.trim() || isConsulting}
+                className="px-6 bg-white text-black rounded-xl text-sm font-bold hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 disabled:bg-white/10 disabled:text-white/20 flex items-center gap-2"
              >
-                Ask
+                {isConsulting ? (
+                    <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                ) : (
+                    <>
+                        Ask <Send className="w-3 h-3" />
+                    </>
+                )}
              </button>
          </div>
       </div>

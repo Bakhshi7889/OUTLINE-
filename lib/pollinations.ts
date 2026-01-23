@@ -14,74 +14,103 @@ export const streamGeneration = async (
   callbacks: StreamCallbacks
 ) => {
   try {
-    const apiKey = process.env.API_KEY;
+    const apiKey = "sk_2qBbXsu31elnkK2rhJ2jC5zyuDHElBjt";
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-
-    if (apiKey) {
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    }
-
-    // Using text.pollinations.ai with deepseek model
-    // This endpoint streams raw text which we parse for <think> tags
-    const response = await fetch('https://text.pollinations.ai/', {
+    const response = await fetch('https://gen.pollinations.ai/v1/chat/completions', {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
       body: JSON.stringify({
+        model: 'deepseek',
         messages: messages,
-        model: 'deepseek', 
-        stream: true,      
-        jsonMode: false,
-        seed: Math.floor(Math.random() * 10000)
+        stream: true,
+        max_tokens: 8000, // Ensure enough tokens for long documents
+        temperature: 0.7
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`Pollinations API Error: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`API Error ${response.status}: ${errorText}`);
     }
 
     const reader = response.body?.getReader();
-    if (!reader) throw new Error("Response body is empty");
+    if (!reader) throw new Error("No response body available");
     
     const decoder = new TextDecoder();
-    let isThinking = false;
+    let buffer = '';
+    let isThinking = false; // Legacy fallback for tag-based thinking
     
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       
       const chunk = decoder.decode(value, { stream: true });
+      buffer += chunk;
       
-      // Basic state machine to separate <think> content from real content
-      let processChunk = chunk;
-      
-      if (processChunk.includes('<think>')) {
-        isThinking = true;
-        const parts = processChunk.split('<think>');
-        if (parts[0]) callbacks.onChunk(parts[0]); // Content before tag
-        processChunk = parts[1] || ''; // Continue processing after tag
-      }
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep the last incomplete line
 
-      if (processChunk.includes('</think>')) {
-        isThinking = false;
-        const parts = processChunk.split('</think>');
-        if (parts[0]) callbacks.onThinking(parts[0]); // Content inside tag
-        if (parts[1]) callbacks.onChunk(parts[1]);    // Content after tag
-        continue;
-      }
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+        
+        const dataStr = trimmed.slice(6);
+        if (dataStr === '[DONE]') continue;
 
-      if (isThinking) {
-        callbacks.onThinking(processChunk);
-      } else {
-        callbacks.onChunk(processChunk);
+        try {
+          const json = JSON.parse(dataStr);
+          const choice = json.choices?.[0];
+          
+          if (!choice) continue;
+
+          // 1. Handle Native Reasoning Field (if supported by provider)
+          const reasoning = choice.delta?.reasoning_content;
+          if (reasoning) {
+            callbacks.onThinking(reasoning);
+          }
+
+          // 2. Handle Content Field (mixed with tags or pure content)
+          const content = choice.delta?.content;
+          if (content) {
+            // Simple state machine for <think> tags in content
+            // This handles cases where deepseek outputs tags inline
+            let processChunk = content;
+
+            if (processChunk.includes('<think>')) {
+              isThinking = true;
+              const parts = processChunk.split('<think>');
+              if (parts[0]) callbacks.onChunk(parts[0]);
+              processChunk = parts[1] || '';
+            }
+
+            if (processChunk.includes('</think>')) {
+              isThinking = false;
+              const parts = processChunk.split('</think>');
+              if (parts[0]) callbacks.onThinking(parts[0]);
+              if (parts[1]) callbacks.onChunk(parts[1]);
+              continue;
+            }
+
+            if (isThinking) {
+              callbacks.onThinking(processChunk);
+            } else {
+              callbacks.onChunk(processChunk);
+            }
+          }
+
+        } catch (e) {
+          console.warn("Failed to parse SSE JSON:", e);
+        }
       }
     }
     
     callbacks.onComplete();
 
   } catch (err) {
+    console.error("Stream Generation Error:", err);
     callbacks.onError(err instanceof Error ? err.message : "Unknown network error");
   }
 };
